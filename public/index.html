@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CampusConnect</title>
+<style>
+:root{--navy:#101F3C;--sky:#A9D9FF;--sun:#F8CC4D;--bg:#F3F6FA;--ink:#1b2438;--mute:#66728a}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}
+.btn{background:var(--sun);color:var(--navy);border:0;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer}
+.btn.alt{background:#fff;border:1px solid #cfd8e6}.btn.dark{background:var(--navy);color:#fff}.btn.danger{background:#e5484d;color:#fff}.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input,select,textarea{width:100%;padding:10px;border:1px solid #cfd8e6;border-radius:8px;background:#fff;margin:4px 0 12px}
+label{font-size:13px;font-weight:600;color:var(--mute)}
+.auth{min-height:100vh;display:grid;place-items:center;background:var(--navy);padding:16px}
+.auth .box{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:400px}
+.auth h1{margin:0 0 4px;color:var(--navy)}.tag{color:var(--mute);margin:0 0 18px;font-size:14px}
+.link{color:#2563eb;cursor:pointer;font-size:14px;text-decoration:underline}
+.err{background:#fde8e8;color:#b42318;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:14px}
+.ok{background:#e3f6e8;color:#14693a;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:14px}
+.app{display:flex;min-height:100vh}
+.side{width:230px;background:var(--navy);color:#fff;padding:16px 10px;flex-shrink:0}
+.side h2{margin:4px 10px 16px;color:var(--sun)}
+.nav{display:block;width:100%;text-align:left;background:none;border:0;color:#cfe3ff;padding:11px 12px;border-radius:8px;cursor:pointer;margin-bottom:2px}
+.nav.on{background:var(--sun);color:var(--navy);font-weight:700}
+.main{flex:1;min-width:0}
+.top{background:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e3e9f2;gap:10px}
+.content{padding:24px;max-width:1100px}
+h2.pg{margin:0 0 16px;color:var(--navy)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(16,31,60,.08)}
+.card h3{margin:6px 0;font-size:17px;color:var(--navy)}.card p{color:var(--mute);font-size:14px;margin:6px 0}
+.pill{display:inline-block;background:var(--sky);color:var(--navy);border-radius:99px;padding:2px 10px;font-size:12px;font-weight:600;margin-right:4px}
+.pill.y{background:var(--sun)}.pill.g{background:#c8f0d4}.pill.r{background:#fbd5d5}
+.stat{font-size:30px;font-weight:800;color:var(--navy)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.row>*{margin:0}.row input,.row select{width:auto;flex:1;min-width:140px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{border:1px solid #cfd8e6;background:#fff;border-radius:99px;padding:6px 14px;cursor:pointer;font-size:14px}.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden}th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #eef2f8;font-size:14px}th{background:#f7f9fc;color:var(--mute)}
+.modal{position:fixed;inset:0;background:rgba(10,18,36,.55);display:grid;place-items:center;padding:16px;z-index:9}
+.modal .card{max-width:560px;width:100%;max-height:90vh;overflow:auto}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:10px;z-index:99}
+.stamp{border:2px dashed var(--navy);border-radius:12px;padding:12px;background:#fffbea}
+@media(max-width:760px){.app{flex-direction:column}.side{width:100%;display:flex;overflow-x:auto;padding:8px}.side h2{display:none}.nav{white-space:nowrap;width:auto}.content{padding:14px}.top{padding:10px 14px}}
+</style></head>
+<body><div id="root"></div>
+<script>
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S={token:localStorage.getItem('cc_token'),role:null,user:null,meta:null,page:'dashboard'};
+
+async function api(path,method='GET',body){
+  const r=await fetch(path,{method,headers:{'Content-Type':'application/json',...(S.token?{Authorization:'Bearer '+S.token}:{})},body:body?JSON.stringify(body):undefined});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ if(r.status===401&&S.token){logout(true)} throw new Error(d.error||'Request failed'); }
+  return d;
+}
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+function logout(silent){localStorage.removeItem('cc_token');S={token:null,role:null,user:null,meta:null,page:'dashboard'};authView('login')}
+function setSession(d){S.token=d.token;S.role=d.role;S.user=d.user;localStorage.setItem('cc_token',d.token);S.page=d.role==='admin'?'a_dash':'dashboard';boot()}
+
+// ---------- AUTH ----------
+function authView(mode,msg){
+  const R=$('#root');
+  const f=(id,l,t='text',ph='')=>`<label>${l}</label><input id="${id}" type="${t}" placeholder="${ph}">`;
+  let inner='';
+  if(mode==='login')inner=`<h1>CampusConnect</h1><p class="tag">Your campus. Your people. Your possibilities.</p>${msg?`<div class="ok">${esc(msg)}</div>`:''}<div id="e"></div>${f('em','Email','email','alex@campusconnect.edu')}${f('pw','Password','password')}<button class="btn" style="width:100%" id="go">Sign in</button><p style="margin-top:14px"><span class="link" id="toReg">Create a student account</span> &nbsp;·&nbsp; <span class="link" id="toAdm">Admin sign in →</span></p><p class="tag">Demo: alex@campusconnect.edu / student123</p>`;
+  if(mode==='admin')inner=`<h1>Admin Studio</h1><p class="tag">Authorised administrators only</p><div id="e"></div>${f('em','Admin email','email','admin@campusconnect.edu')}${f('pw','Password','password')}<button class="btn dark" style="width:100%" id="go">Sign in as admin</button><p style="margin-top:14px"><span class="link" id="toLog">← Student sign in</span></p><p class="tag">Demo: admin@campusconnect.edu / admin123</p>`;
+  if(mode==='reg')inner=`<h1>Create account</h1><p class="tag">Join CampusConnect</p><div id="e"></div>${f('nm','Full name')}${f('em','Email','email')}${f('dp','Department','text','e.g. Computer Science')}<label>Year of study</label><select id="yr"><option>1</option><option>2</option><option>3</option><option>4</option></select>${f('pw','Password (min 6)','password')}${f('pw2','Confirm password','password')}<button class="btn" style="width:100%" id="go">Register</button><p style="margin-top:14px"><span class="link" id="toLog">← Back to sign in</span></p>`;
+  R.innerHTML=`<div class="auth"><div class="box">${inner}</div></div>`;
+  const E=m=>$('#e').innerHTML=`<div class="err">${esc(m)}</div>`;
+  $('#toReg')&&($('#toReg').onclick=()=>authView('reg'));$('#toAdm')&&($('#toAdm').onclick=()=>authView('admin'));$('#toLog')&&($('#toLog').onclick=()=>authView('login'));
+  document.querySelectorAll('.box input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')$('#go').click()}));
+  $('#go').onclick=async()=>{
+    try{
+      if(mode==='login')setSession(await api('/api/login','POST',{email:$('#em').value,password:$('#pw').value}));
+      if(mode==='admin')setSession(await api('/api/admin/login','POST',{email:$('#em').value,password:$('#pw').value}));
+      if(mode==='reg')setSession(await api('/api/register','POST',{name:$('#nm').value,email:$('#em').value,department:$('#dp').value,yearOfStudy:$('#yr').value,password:$('#pw').value,confirmPassword:$('#pw2').value}));
+    }catch(e){E(e.message)}
+  };
+}
+
+// ---------- SHELL ----------
+const STUDENT_NAV=[['dashboard','🏠 Dashboard'],['clubs','🏛️ Discover Clubs'],['events','📅 Events'],['beyond','🚀 Beyond the Classroom'],['passport','🎒 Campus Passport'],['mycampus','🗂️ My Campus'],['profile','👤 My Profile']];
+const ADMIN_NAV=[['a_dash','📊 Dashboard'],['a_clubs','🏛️ Manage Clubs'],['a_events','📅 Manage Events'],['a_att','✅ Attendance']];
+async function boot(){
+  if(!S.token)return authView('login');
+  try{ if(!S.user){const me=await api('/api/me');S.role=me.role;S.user=me.user;S.page=S.role==='admin'?'a_dash':'dashboard'} if(S.role==='student')S.meta=await api('/api/meta'); }catch{return authView('login')}
+  const nav=S.role==='admin'?ADMIN_NAV:STUDENT_NAV;
+  $('#root').innerHTML=`<div class="app"><aside class="side"><h2>CampusConnect</h2>${nav.map(([k,l])=>`<button class="nav ${S.page===k?'on':''}" data-k="${k}">${l}</button>`).join('')}</aside><div class="main"><div class="top"><b>${S.role==='admin'?'Admin Studio':'Welcome, '+esc(S.user.name)}</b><button class="btn alt sm" id="lo">Log out</button></div><div class="content" id="view"></div></div></div>`;
+  document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{S.page=b.dataset.k;boot()});
+  $('#lo').onclick=()=>logout();
+  const v=$('#view');v.innerHTML='Loading…';
+  try{await VIEWS[S.page](v)}catch(e){v.innerHTML=`<div class="err">${esc(e.message)}</div>`}
+}
+function modal(html){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="card">${html}</div>`;m.onclick=e=>{if(e.target===m)m.remove()};document.body.appendChild(m);return m}
+const fmtDate=d=>d?String(d).slice(0,10):'';
+
+// ---------- STUDENT CARDS ----------
+const eventCard=(e,extra='')=>`<div class="card"><span class="pill y">${esc(e.opportunityType)}</span><span class="pill">${esc(e.category)}</span><h3>${esc(e.title)}</h3><p>📅 ${fmtDate(e.eventDate)} · 📍 ${esc(e.venue)}</p><p>Seats left: <b>${e.availableSeats}</b> / ${e.capacity}</p>${extra}<div class="row" style="margin:8px 0 0"><button class="btn sm" data-view="${e.id}">View details</button>${e.registered?'<span class="pill g">Registered</span>':''}${e.saved?'<span class="pill">★ Saved</span>':''}</div></div>`;
+function bindEventCards(root,reload){
+  root.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>eventModal(b.dataset.view,reload));
+}
+async function eventModal(id,reload){
+  const e=await api('/api/events/'+id);
+  const m=modal(`<span class="pill y">${esc(e.opportunityType)}</span><span class="pill">${esc(e.category)}</span><h3>${esc(e.title)}</h3><p>${esc(e.description)}</p><p>📅 ${fmtDate(e.eventDate)} · 📍 ${esc(e.venue)}<br>🏢 ${esc(e.organizer)}<br>🎓 ${esc(e.eligibility)}<br>⏰ Register by: ${esc(e.regDeadline||'—')}<br>💺 ${e.availableSeats} of ${e.capacity} seats left</p><div id="me"></div><div class="row"><button class="btn" id="reg">${e.registered?'Cancel registration':'Register'}</button><button class="btn alt" id="sv">${e.saved?'Unsave':'★ Save'}</button><button class="btn alt" id="cl">Close</button></div>`);
+  const done=async(fn)=>{try{const r=await fn();toast(r.message||'Done');m.remove();reload&&reload()}catch(x){$('#me',m).innerHTML=`<div class="err">${esc(x.message)}</div>`}};
+  $('#reg',m).onclick=()=>done(()=>api(`/api/events/${id}/${e.registered?'cancel':'register'}`,'POST'));
+  $('#sv',m).onclick=()=>done(()=>api(`/api/events/${id}/${e.saved?'unsave':'save'}`,'POST'));
+  $('#cl',m).onclick=()=>m.remove();
+}
+const clubCard=c=>`<div class="card"><span class="pill">${esc(c.category)}</span><h3>${esc(c.name)}</h3><p>${esc(c.description)}</p><p>✉️ ${esc(c.contactEmail)}<br>📍 ${esc(c.contactInfo)}</p>${c.reason?`<span class="pill y">${esc(c.reason)}</span>`:''}</div>`;
+
+function filterBar(v,opts,render){
+  const st={q:'',category:'',type:''};
+  v.innerHTML+=''; 
+  return st;
+}
+
+// ---------- STUDENT VIEWS ----------
+const VIEWS={
+ async dashboard(v){
+  const [rec,mc,pp]=await Promise.all([api('/api/recommendations'),api('/api/my-campus'),api('/api/passport')]);
+  const upcoming=mc.registrations.filter(r=>r.status==='REGISTERED').length;
+  v.innerHTML=`<h2 class="pg">Dashboard</h2><div class="grid" style="margin-bottom:24px"><div class="card"><div class="stat">${upcoming}</div>Active registrations</div><div class="card"><div class="stat">${mc.saved.length}</div>Saved events</div><div class="card"><div class="stat">${pp.total}</div>Verified stamps</div><div class="card"><div class="stat">${pp.badges.length}</div>Badges earned</div></div><h2 class="pg">⭐ Picked for Your Interests</h2>${S.user.interests.length?'':'<div class="card">Select interests in <b>My Profile</b> to get personalised matches.</div>'}<div class="grid" id="rg">${rec.events.slice(0,6).map(e=>eventCard(e,`<span class="pill y">${esc(e.reason)}</span>`)).join('')}</div>${rec.clubs.length?`<h2 class="pg" style="margin-top:24px">Clubs for you</h2><div class="grid">${rec.clubs.slice(0,4).map(clubCard).join('')}</div>`:''}`;
+  bindEventCards(v,boot);
+ },
+ async clubs(v){
+  let q='',cat='';
+  v.innerHTML=`<h2 class="pg">Discover Clubs</h2><div class="row"><input id="q" placeholder="Search clubs…"><select id="c"><option value="">All categories</option>${S.meta.clubCategories.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div><div class="grid" id="l"></div>`;
+  const load=async()=>{const r=await api(`/api/clubs?q=${encodeURIComponent($('#q').value)}&category=${encodeURIComponent($('#c').value)}`);$('#l').innerHTML=r.map(clubCard).join('')||'<p>No clubs found.</p>'};
+  $('#q').oninput=load;$('#c').onchange=load;load();
+ },
+ async events(v){return listEvents(v,'Events & Opportunities',false)},
+ async beyond(v){return listEvents(v,'Beyond the Classroom',true)},
+ async passport(v){
+  const p=await api('/api/passport');
+  v.innerHTML=`<h2 class="pg">🎒 Campus Passport</h2><p>Only admin-verified attendance earns a stamp. Registering alone does not.</p><h3>Badges</h3><div class="row">${p.badges.map(b=>`<span class="pill y" style="font-size:15px;padding:6px 14px">${esc(b)}</span>`).join('')||'<span>No badges yet — attend an event!</span>'}</div><h3>Stamps (${p.total})</h3><div class="grid">${p.stamps.map(s=>`<div class="stamp"><b>${esc(s.title)}</b><p>${esc(s.category)} · ${esc(s.opportunityType)}<br>${fmtDate(s.eventDate)}<br>✅ Verified ${fmtDate(s.verifiedAt)}</p></div>`).join('')||'<p>No stamps yet.</p>'}</div>`;
+ },
+ async mycampus(v){
+  const d=await api('/api/my-campus');
+  v.innerHTML=`<h2 class="pg">My Campus</h2><h3>My registrations</h3><table><tr><th>Event</th><th>Date</th><th>Status</th><th>Attendance</th></tr>${d.registrations.map(r=>`<tr><td>${esc(r.title)}</td><td>${fmtDate(r.eventDate)}</td><td><span class="pill ${r.status==='REGISTERED'?'g':'r'}">${r.status}</span></td><td>${r.attendanceStatus}</td></tr>`).join('')||'<tr><td colspan=4>None yet.</td></tr>'}</table><h3 style="margin-top:24px">Saved events</h3><div class="grid">${d.saved.map(e=>eventCard(e)).join('')||'<p>Nothing saved.</p>'}</div>`;
+  bindEventCards(v,boot);
+ },
+ async profile(v){
+  const u=S.user,sel=new Set(u.interests);
+  v.innerHTML=`<h2 class="pg">My Profile</h2><div class="card" style="max-width:560px"><div id="e"></div><label>Name</label><input id="nm" value="${esc(u.name)}"><label>Email (cannot be changed)</label><input value="${esc(u.email)}" disabled><label>Department</label><input id="dp" value="${esc(u.department)}"><label>Year of study</label><select id="yr">${[1,2,3,4].map(y=>`<option ${y==u.yearOfStudy?'selected':''}>${y}</option>`).join('')}</select><label>Interests (used for Opportunity Match)</label><div class="chips" id="ch">${S.meta.interests.map(i=>`<span class="chip ${sel.has(i)?'on':''}" data-i="${esc(i)}">${esc(i)}</span>`).join('')}</div><button class="btn" id="sv">Save profile</button></div>`;
+  v.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{const i=c.dataset.i;sel.has(i)?sel.delete(i):sel.add(i);c.classList.toggle('on')});
+  $('#sv').onclick=async()=>{try{S.user=await api('/api/profile','PUT',{name:$('#nm').value,department:$('#dp').value,yearOfStudy:$('#yr').value,interests:[...sel]});toast('Profile saved');boot()}catch(e){$('#e').innerHTML=`<div class="err">${esc(e.message)}</div>`}};
+ },
+
+ // ---------- ADMIN ----------
+ async a_dash(v){
+  const s=await api('/api/admin/stats');
+  const items=[['👤','Total Students',s.students],['🏛️','Total Clubs',s.clubs],['📅','Total Events',s.events],['🚀','Upcoming Events',s.upcoming],['📋','Total Registrations',s.registrations],['✅','Verified Attendance',s.verified]];
+  v.innerHTML=`<h2 class="pg">Admin Dashboard</h2><div class="grid">${items.map(([i,l,n])=>`<div class="card"><div>${i} ${l}</div><div class="stat">${n}</div></div>`).join('')}</div>`;
+ },
+ async a_clubs(v){
+  const list=await api('/api/admin/clubs');
+  v.innerHTML=`<h2 class="pg">Manage Clubs</h2><button class="btn" id="add" style="margin-bottom:14px">+ Add club</button><table><tr><th>Name</th><th>Category</th><th>Contact</th><th></th></tr>${list.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.category)}</td><td>${esc(c.contactEmail)}</td><td><button class="btn alt sm" data-e="${c.id}">Edit</button> <button class="btn danger sm" data-d="${c.id}">Archive</button></td></tr>`).join('')}</table>`;
+  const form=(c={})=>{const m=modal(`<h3>${c.id?'Edit':'Add'} club</h3><div id="e"></div><label>Name</label><input id="n" value="${esc(c.name)}"><label>Category</label><input id="c" value="${esc(c.category)}" placeholder="Technology, Cultural, Sports…"><label>Description</label><textarea id="d" rows="3">${esc(c.description)}</textarea><label>Contact email</label><input id="ce" value="${esc(c.contactEmail)}"><label>Location / contact info</label><input id="ci" value="${esc(c.contactInfo)}"><div class="row"><button class="btn" id="s">Save</button><button class="btn alt" id="x">Cancel</button></div>`);
+   $('#x',m).onclick=()=>m.remove();
+   $('#s',m).onclick=async()=>{try{const b={name:$('#n',m).value,category:$('#c',m).value,description:$('#d',m).value,contactEmail:$('#ce',m).value,contactInfo:$('#ci',m).value};await api(c.id?'/api/admin/clubs/'+c.id:'/api/admin/clubs',c.id?'PUT':'POST',b);m.remove();boot()}catch(e){$('#e',m).innerHTML=`<div class="err">${esc(e.message)}</div>`}}};
+  $('#add').onclick=()=>form();
+  v.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>form(list.find(c=>c.id==b.dataset.e)));
+  v.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(confirm('Archive this club?')){await api('/api/admin/clubs/'+b.dataset.d,'DELETE');boot()}});
+ },
+ async a_events(v){
+  const list=await api('/api/admin/events');
+  v.innerHTML=`<h2 class="pg">Manage Events</h2><button class="btn" id="add" style="margin-bottom:14px">+ Add event</button><table><tr><th>Title</th><th>Type</th><th>Date</th><th>Seats</th><th></th></tr>${list.map(e=>`<tr><td>${esc(e.title)}</td><td>${esc(e.opportunityType)}</td><td>${fmtDate(e.eventDate)}</td><td>${e.availableSeats}/${e.capacity}</td><td><button class="btn alt sm" data-e="${e.id}">Edit</button> <button class="btn danger sm" data-d="${e.id}">Archive</button></td></tr>`).join('')}</table>`;
+  const form=(x={})=>{const m=modal(`<h3>${x.id?'Edit':'Add'} event</h3><div id="e"></div><label>Title</label><input id="t" value="${esc(x.title)}"><label>Description</label><textarea id="d" rows="3">${esc(x.description)}</textarea><label>Category</label><input id="c" value="${esc(x.category)}" placeholder="Technology, Design, Cultural…"><label>Opportunity type</label><input id="o" value="${esc(x.opportunityType)}" placeholder="Hackathon, Workshop, Competition, Volunteering…"><label>Event date</label><input id="dt" type="date" value="${fmtDate(x.eventDate)}"><label>Venue</label><input id="v" value="${esc(x.venue)}"><label>Organizer</label><input id="og" value="${esc(x.organizer)}"><label>Registration deadline</label><input id="rd" type="datetime-local" value="${x.regDeadline?String(x.regDeadline).replace(' ','T').slice(0,16):''}"><label>Eligibility</label><input id="el" value="${esc(x.eligibility||'All Students')}"><label>Capacity</label><input id="cp" type="number" min="1" value="${x.capacity||50}"><div class="row"><button class="btn" id="s">Save</button><button class="btn alt" id="x">Cancel</button></div>`);
+   $('#x',m).onclick=()=>m.remove();
+   $('#s',m).onclick=async()=>{try{const b={title:$('#t',m).value,description:$('#d',m).value,category:$('#c',m).value,opportunityType:$('#o',m).value,eventDate:$('#dt',m).value,venue:$('#v',m).value,organizer:$('#og',m).value,regDeadline:$('#rd',m).value?$('#rd',m).value.replace('T',' ')+':00':null,eligibility:$('#el',m).value,capacity:$('#cp',m).value};await api(x.id?'/api/admin/events/'+x.id:'/api/admin/events',x.id?'PUT':'POST',b);m.remove();boot()}catch(e){$('#e',m).innerHTML=`<div class="err">${esc(e.message)}</div>`}}};
+  $('#add').onclick=()=>form();
+  v.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>form(list.find(c=>c.id==b.dataset.e)));
+  v.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(confirm('Archive this event?')){await api('/api/admin/events/'+b.dataset.d,'DELETE');boot()}});
+ },
+ async a_att(v){
+  const evs=await api('/api/admin/events');
+  v.innerHTML=`<h2 class="pg">Attendance Verification</h2><select id="ev"><option value="">Select an event…</option>${evs.map(e=>`<option value="${e.id}">${esc(e.title)} (${fmtDate(e.eventDate)})</option>`).join('')}</select><div id="tb"></div>`;
+  const load=async()=>{const id=$('#ev').value;if(!id){$('#tb').innerHTML='';return}
+   const r=await api(`/api/admin/events/${id}/registrations`);
+   $('#tb').innerHTML=`<table><tr><th>Student</th><th>Email</th><th>Attendance</th><th>Verified by</th><th></th></tr>${r.map(x=>`<tr><td>${esc(x.studentName)}</td><td>${esc(x.email)}</td><td><span class="pill ${x.attendanceStatus==='ATTENDED'?'g':x.attendanceStatus==='NOT_ATTENDED'?'r':''}">${x.attendanceStatus}</span></td><td>${esc(x.verifiedBy||'')}</td><td><button class="btn sm" data-a="${x.id}" data-s="ATTENDED">Mark attended</button> <button class="btn alt sm" data-a="${x.id}" data-s="NOT_ATTENDED">Absent</button></td></tr>`).join('')||'<tr><td colspan=5>No registrations.</td></tr>'}</table>`;
+   $('#tb').querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{await api(`/api/admin/registrations/${b.dataset.a}/attendance`,'POST',{status:b.dataset.s});toast('Updated');load()})};
+  $('#ev').onchange=load;
+ },
+};
+async function listEvents(v,title,beyond){
+  v.innerHTML=`<h2 class="pg">${title}</h2>${beyond?'<div class="chips" id="tp"></div>':''}<div class="row"><input id="q" placeholder="Search…"><select id="c"><option value="">All categories</option>${S.meta.eventCategories.map(c=>`<option>${esc(c)}</option>`).join('')}</select>${beyond?'':`<select id="t"><option value="">All types</option>${S.meta.eventTypes.map(c=>`<option>${esc(c)}</option>`).join('')}</select>`}</div><div class="grid" id="l"></div>`;
+  let type='';
+  if(beyond){const tp=$('#tp');tp.innerHTML=['All',...S.meta.eventTypes].map(t=>`<span class="chip ${t==='All'?'on':''}" data-t="${t==='All'?'':esc(t)}">${esc(t)}</span>`).join('');tp.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{type=c.dataset.t;tp.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c));load()})}
+  const load=async()=>{const t=beyond?type:$('#t').value;const r=await api(`/api/events?q=${encodeURIComponent($('#q').value)}&category=${encodeURIComponent($('#c').value)}&type=${encodeURIComponent(t)}`);$('#l').innerHTML=r.map(e=>eventCard(e)).join('')||'<p>No events found.</p>';bindEventCards($('#l'),load)};
+  $('#q').oninput=load;$('#c').onchange=load;$('#t')&&($('#t').onchange=load);load();
+}
+boot();
+</script></body></html>
